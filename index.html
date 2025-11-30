@@ -47,6 +47,32 @@
       class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2">
   </section>
 
+  <!-- Filters -->
+<div class="mt-4 flex flex-wrap gap-3 text-sm">
+
+  <select id="filterCompany"
+    class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2">
+    <option value="">All Companies</option>
+  </select>
+
+  <select id="filterRemote"
+    class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2">
+    <option value="">Remote + Onsite</option>
+    <option value="remote">Remote Only</option>
+    <option value="onsite">Onsite Only</option>
+  </select>
+
+  <select id="filterDate"
+    class="bg-slate-900 border border-slate-700 rounded-xl px-3 py-2">
+    <option value="">Any Time</option>
+    <option value="1">Last 24 Hours</option>
+    <option value="3">Last 3 Days</option>
+    <option value="7">Last 7 Days</option>
+  </select>
+
+</div>
+
+
   <!-- JOB LIST -->
   <section class="max-w-4xl mx-auto px-6 pb-20">
     <div id="jobsList" class="space-y-4"></div>
@@ -114,4 +140,5 @@
 
 </body>
 </html>
+
 
