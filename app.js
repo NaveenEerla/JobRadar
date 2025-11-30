@@ -199,19 +199,31 @@ function renderJobs(jobs) {
   const list = document.getElementById("jobsList");
   const empty = document.getElementById("noJobs");
 
-  list.innerHTML = "";
+  let search = document.getElementById("searchInput").value.toLowerCase();
+  let companyFilter = document.getElementById("filterCompany").value;
+  let remoteFilter = document.getElementById("filterRemote").value;
+  let dateFilter = document.getElementById("filterDate").value;
 
-  if (!jobs.length) {
-    empty.classList.remove("hidden");
-    return;
-  }
+  const now = Date.now();
 
-  empty.classList.add("hidden");
+  let filtered = jobs.filter(job => {
+    const hay = (job.title + " " + job.company).toLowerCase();
 
-  jobs.forEach(job => {
-    list.appendChild(createJobCard(job));
+    if (search && !hay.includes(search)) return false;
+
+    if (companyFilter && job.company !== companyFilter) return false;
+
+    if (remoteFilter === "remote" && !job.remote) return false;
+    if (remoteFilter === "onsite" && job.remote) return false;
+
+    if (dateFilter) {
+      const diff = (now - new Date(job.posted_at).getTime()) / 86400000;
+      if (diff > Number(dateFilter)) return false;
+    }
+
+    return true;
   });
-}
+
 
 /*************************************************
  * LOAD JOBS (FROM WORKER API)
@@ -228,7 +240,25 @@ async function loadJobs() {
   } catch (err) {
     console.error("Failed to load jobs:", err);
   }
+
+  ALL_JOBS = await res.json();
+populateCompanyFilter();
+renderJobs(ALL_JOBS);
+
 }
+
+  function populateCompanyFilter() {
+  const select = document.getElementById("filterCompany");
+  const companies = [...new Set(ALL_JOBS.map(j => j.company))].sort();
+
+  companies.forEach(co => {
+    const opt = document.createElement("option");
+    opt.value = co;
+    opt.textContent = co;
+    select.appendChild(opt);
+  });
+}
+
 
 /*************************************************
  * SAVE / UNSAVE JOB
@@ -268,3 +298,4 @@ function openAuthModal() {
 function closeAuthModal() {
   document.getElementById("authModal").classList.add("hidden");
 }
+
