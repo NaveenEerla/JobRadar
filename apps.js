@@ -1,56 +1,56 @@
-// ----------------------
-// CONFIG
-// ----------------------
-const SUPABASE_URL = "https://motqrqculnywuovnibye.supabase.co";
-const SUPABASE_ANON = "YOUR_PUBLIC_ANON_KEY"; // paste your anon key here
 const API_BASE = "https://floral-bird-8171.naveeneerla2022.workers.dev";
 
-// ----------------------
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
+// ----------------------------
+// Supabase Client
+// ----------------------------
+const supabase = supabase.createClient(
+  "https://motqrqculnywuovnibye.supabase.co",
+  "your-anon-key-here"
+);
 
 let currentUser = null;
+let isPremium = false;
+let saved = new Set();
 let ALL_JOBS = [];
-let SAVED = new Set();
-let IS_PREMIUM = false;
 
-
-// ----------------------
-// UI Helper Functions
-// ----------------------
-function $(id) {
-  return document.getElementById(id);
+// ----------------------------
+// Auth Modal
+// ----------------------------
+function openAuthModal() {
+  document.getElementById("authModal").classList.remove("hidden");
 }
 
-function openAuthModal() { $("authModal").classList.remove("hidden"); }
-function closeAuthModal() { $("authModal").classList.add("hidden"); }
+function closeAuthModal() {
+  document.getElementById("authModal").classList.add("hidden");
+}
 
-function openPremiumModal() { $("premiumModal").classList.remove("hidden"); }
-function closePremiumModal() { $("premiumModal").classList.add("hidden"); }
+document.getElementById("loginBtn").onclick = openAuthModal;
 
-function openResumeModal() { $("resumeModal").classList.remove("hidden"); }
-function closeResumeModal() { $("resumeModal").classList.add("hidden"); }
+// Toggle Login <-> Signup
+document.getElementById("signupToggle").onclick = () => {
+  const title = document.getElementById("authTitle");
+  const submit = document.getElementById("loginSubmit");
 
-
-// ----------------------
-// LOGIN / SIGNUP LOGIC
-// ----------------------
-$("loginBtn").onclick = openAuthModal;
-
-$("signupToggle").onclick = () => {
-  const title = $("authTitle");
-  title.textContent = title.textContent === "Login" ? "Sign Up" : "Login";
+  if (title.innerText === "Login") {
+    title.innerText = "Sign Up";
+    submit.innerText = "Create Account";
+  } else {
+    title.innerText = "Login";
+    submit.innerText = "Login";
+  }
 };
 
-$("loginSubmit").onclick = async () => {
-  const email = $("authEmail").value;
-  const pass = $("authPassword").value;
-  const mode = $("authTitle").textContent;
-  const errorBox = $("authError");
+// Login / Signup
+document.getElementById("loginSubmit").onclick = async () => {
+  const email = document.getElementById("authEmail").value.trim();
+  const pass = document.getElementById("authPassword").value.trim();
+  const errorBox = document.getElementById("authError");
 
   errorBox.classList.add("hidden");
 
-  let result;
+  const mode = document.getElementById("authTitle").innerText;
 
+  let result;
   if (mode === "Login") {
     result = await supabase.auth.signInWithPassword({ email, password: pass });
   } else {
@@ -58,7 +58,7 @@ $("loginSubmit").onclick = async () => {
   }
 
   if (result.error) {
-    errorBox.textContent = result.error.message;
+    errorBox.innerText = result.error.message;
     errorBox.classList.remove("hidden");
     return;
   }
@@ -67,203 +67,131 @@ $("loginSubmit").onclick = async () => {
   restoreSession();
 };
 
-
-// ----------------------
-// RESTORE SESSION
-// ----------------------
+// Restore Session
 async function restoreSession() {
   const { data } = await supabase.auth.getUser();
   currentUser = data.user;
 
   if (!currentUser) {
-    $("loginBtn").classList.remove("hidden");
-    $("logoutBtn").classList.add("hidden");
-    IS_PREMIUM = false;
-    SAVED = new Set();
-    renderJobs(ALL_JOBS);
+    isPremium = false;
+    saved = new Set();
+    document.getElementById("logoutBtn").classList.add("hidden");
+    document.getElementById("loginBtn").classList.remove("hidden");
     return;
   }
 
-  $("loginBtn").classList.add("hidden");
-  $("logoutBtn").classList.remove("hidden");
+  document.getElementById("loginBtn").classList.add("hidden");
+  document.getElementById("logoutBtn").classList.remove("hidden");
 
-  await refreshPremium();
-  await loadSavedJobs();
+  await checkPremium();
+  await loadSaved();
   renderJobs(ALL_JOBS);
 }
 
-$("logoutBtn").onclick = async () => {
+document.getElementById("logoutBtn").onclick = async () => {
   await supabase.auth.signOut();
-  currentUser = null;
-  SAVED = new Set();
-  IS_PREMIUM = false;
-  restoreSession();
+  location.reload();
 };
 
-
-// ----------------------
-// PREMIUM
-// ----------------------
-async function refreshPremium() {
-  if (!currentUser) return false;
-
-  const res = await fetch(`${API_BASE}/api/checkPremium?user_id=${currentUser.id}`);
-  const json = await res.json();
-  IS_PREMIUM = json.active;
-}
-
-
-// ----------------------
-// SAVED JOBS
-// ----------------------
-async function loadSavedJobs() {
+// ----------------------------
+// Premium Check
+// ----------------------------
+async function checkPremium() {
   if (!currentUser) return;
 
-  const res = await fetch(`${API_BASE}/api/savedJobs?user_id=${currentUser.id}`);
-  const json = await res.json();
-
-  SAVED = new Set(json.map(j => j.job_id));
+  const res = await fetch(`${API_BASE}/api/checkPremium?user_id=${currentUser.id}`);
+  if (res.ok) {
+    const json = await res.json();
+    isPremium = json.active === true;
+  }
 }
 
-async function toggleSave(jobId) {
+// ----------------------------
+// Saved Jobs
+// ----------------------------
+async function loadSaved() {
+  if (!currentUser) return;
+
+  const { data } = await supabase
+    .from("saved_jobs")
+    .select("job_id")
+    .eq("user_id", currentUser.id);
+
+  saved = new Set(data?.map((x) => x.job_id));
+}
+
+async function toggleSave(id) {
   if (!currentUser) return openAuthModal();
 
-  if (SAVED.has(jobId)) {
-    await fetch(`${API_BASE}/api/savedJobs?user_id=${currentUser.id}&job_id=${jobId}`, {
-      method: "DELETE"
-    });
-    SAVED.delete(jobId);
+  if (saved.has(id)) {
+    await supabase.from("saved_jobs").delete().eq("user_id", currentUser.id).eq("job_id", id);
+    saved.delete(id);
   } else {
-    await fetch(`${API_BASE}/api/savedJobs?user_id=${currentUser.id}`, {
-      method: "POST",
-      body: JSON.stringify({ job_id: jobId })
-    });
-    SAVED.add(jobId);
+    await supabase.from("saved_jobs").insert({ user_id: currentUser.id, job_id: id });
+    saved.add(id);
   }
 
   renderJobs(ALL_JOBS);
 }
 
+// ----------------------------
+// Render Jobs
+// ----------------------------
+function card(job) {
+  const star = saved.has(job.id) ? "⭐" : "☆";
+  const premiumCover = isPremium ? "" : `
+    <div class="absolute inset-0 bg-black/40 rounded-xl flex flex-col items-center justify-center z-20">
+      <div class="text-emerald-400 text-sm mb-2">🔒 Premium Feature</div>
+    </div>
+  `;
 
-// ----------------------
-// RENDER JOB CARDS
-// ----------------------
-function renderJobs(jobs) {
-  const search = $("searchInput").value.toLowerCase();
-  const list = $("jobsList");
-  const noJobs = $("noJobs");
+  return `
+    <div class="relative bg-slate-900/80 border border-slate-700 p-4 rounded-xl">
+      ${premiumCover}
+      <h3 class="text-lg font-semibold">${job.title}</h3>
+      <p class="text-slate-300">${job.company}</p>
 
-  const filtered = jobs.filter(j =>
-    (j.title + j.company).toLowerCase().includes(search)
+      <div class="mt-3 flex gap-3">
+        <button onclick="toggleSave('${job.id}')"
+          class="px-3 py-1 border border-slate-600 rounded-xl">${star} Save</button>
+
+        <a href="${job.url}" target="_blank"
+          class="px-3 py-1 bg-emerald-500 text-slate-900 rounded-xl">Apply</a>
+      </div>
+    </div>
+  `;
+}
+
+function renderJobs(list) {
+  const container = document.getElementById("jobsList");
+  const search = document.getElementById("searchInput").value.toLowerCase();
+
+  const filtered = list.filter((j) =>
+    (j.title + " " + j.company).toLowerCase().includes(search)
   );
 
   if (!filtered.length) {
-    noJobs.classList.remove("hidden");
-    list.innerHTML = "";
+    document.getElementById("noJobs").classList.remove("hidden");
+    container.innerHTML = "";
     return;
   }
 
-  noJobs.classList.add("hidden");
-  list.innerHTML = "";
+  document.getElementById("noJobs").classList.add("hidden");
 
-  filtered.forEach(job => list.appendChild(renderCard(job)));
+  container.innerHTML = filtered.map(card).join("");
 }
 
-function renderCard(job) {
-  const card = document.createElement("div");
-  card.className = "job-card";
+document.getElementById("searchInput").oninput = () => renderJobs(ALL_JOBS);
 
-  const isSaved = SAVED.has(job.id);
-  const lock = !IS_PREMIUM;
-
-  // Title
-  const title = document.createElement("h3");
-  title.textContent = job.title;
-  title.className = "job-title";
-
-  // Company
-  const company = document.createElement("p");
-  company.textContent = job.company;
-  company.className = "job-company";
-
-  // BUTTONS
-  const btnRow = document.createElement("div");
-  btnRow.className = "btn-row";
-
-  const saveBtn = document.createElement("button");
-  saveBtn.textContent = isSaved ? "⭐ Saved" : "☆ Save";
-  saveBtn.className = "btn";
-  saveBtn.onclick = () => toggleSave(job.id);
-
-  const apply = document.createElement("a");
-  apply.textContent = "Apply";
-  apply.href = job.url;
-  apply.target = "_blank";
-  apply.className = "btn-emerald";
-
-  const resumeBtn = document.createElement("button");
-  resumeBtn.textContent = "✨ Tailor My Resume";
-  resumeBtn.className = lock ? "btn-disabled" : "btn-emerald";
-  resumeBtn.onclick = () => {
-    if (lock) openPremiumModal();
-    else openResume(job);
-  };
-
-  btnRow.append(saveBtn, apply, resumeBtn);
-
-  card.append(title, company, btnRow);
-  return card;
-}
-
-
-// ----------------------
-// RESUME BUILDER
-// ----------------------
-function openResume(job) {
-  $("resumeOutput").value = "Generating...";
-  openResumeModal();
-
-  fetch(`${API_BASE}/api/resume/generate`, {
-    method: "POST",
-    body: JSON.stringify({
-      user_id: currentUser.id,
-      job_title: job.title,
-      job_description: `${job.company} ${job.title}`
-    })
-  })
-    .then(r => r.json())
-    .then(j => $("resumeOutput").value = j.result.text)
-}
-
-function copyResumeOutput() {
-  navigator.clipboard.writeText($("resumeOutput").value);
-}
-
-
-// ----------------------
-// STRIPE CHECKOUT
-// ----------------------
-$("premiumCheckout").onclick = async () => {
-  if (!currentUser) return openAuthModal();
-
-  const res = await fetch(`${API_BASE}/api/checkout`, {
-    method: "POST",
-    body: JSON.stringify({ user_id: currentUser.id })
-  });
-
-  const json = await res.json();
-  if (json.url) location.href = json.url;
-};
-
-
-// ----------------------
-// LOAD JOBS FROM WORKER
-// ----------------------
+// ----------------------------
+// Load Jobs
+// ----------------------------
 async function loadJobs() {
   const res = await fetch(`${API_BASE}/api/jobs`);
-  ALL_JOBS = await res.json();
-  renderJobs(ALL_JOBS);
+  const jobs = await res.json();
+  ALL_JOBS = jobs;
+  renderJobs(jobs);
 }
 
-loadJobs();
 restoreSession();
+loadJobs();
