@@ -3,99 +3,47 @@
 <head>
   <meta charset="UTF-8" />
   <title>Job Radar</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 
-  <link rel="stylesheet" href="./styles.css">
+  <!-- Tailwind -->
   <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Supabase Client -->
   <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+
+  <!-- ENV Variables (WRITE YOUR VALUES HERE) -->
+  <script>
+    window.SUPABASE_URL = "https://motqrqculnywuovnibye.supabase.co";
+    window.SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1vdHFycWN1bG55d3Vvdm5pYnllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE3ODIzMzksImV4cCI6MjA3NzM1ODMzOX0.oAN57AEj9xnXhlkR2r2ZYddzBzptN8VxlXTLLYX5wzY";
+  </script>
+
+  <!-- App Logic -->
+  <script src="/app.js" defer></script>
 </head>
 
 <body class="bg-slate-950 text-slate-100 min-h-screen">
 
-<!-- HEADER -->
-<header class="w-full bg-slate-900 border-b border-slate-800 px-6 py-4 flex justify-between items-center">
-  <h1 class="text-xl font-semibold">Job Radar</h1>
+  <!-- HEADER -->
+  <header class="w-full bg-slate-900 border-b border-slate-800 px-6 py-4 flex justify-between items-center">
+    <h1 class="text-2xl font-semibold">Job Radar</h1>
 
-  <div class="flex items-center gap-3">
-    <button id="premiumBtn"
-      class="hidden px-4 py-2 rounded-xl bg-emerald-500 text-slate-900 text-sm font-semibold hover:bg-emerald-400 transition">
-      ⭐ Premium
-    </button>
-
-    <button id="loginBtn"
-      class="px-4 py-2 rounded-xl border border-slate-600 text-slate-300 text-sm hover:bg-slate-800 transition">
+    <button id="loginBtn" 
+      class="px-4 py-2 rounded-xl border border-slate-600 text-slate-300 hover:bg-slate-800 transition">
       Login
     </button>
+  </header>
 
-    <button id="logoutBtn"
-      class="hidden px-4 py-2 rounded-xl border border-rose-500/80 text-rose-200 text-sm hover:bg-rose-500/10 transition">
-      Logout
-    </button>
-  </div>
-</header>
+  <!-- SEARCH -->
+  <section class="max-w-4xl mx-auto px-6 py-6">
+    <input id="searchInput" placeholder="Search..."
+      class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2" />
+  </section>
 
-<!-- SEARCH BAR -->
-<section class="max-w-4xl mx-auto px-6 py-6">
-  <input id="searchInput" placeholder="Search..."
-    class="w-full rounded-xl bg-slate-900 border border-slate-700 px-3 py-2" />
-</section>
+  <!-- JOB LIST -->
+  <section class="max-w-4xl mx-auto px-6 pb-20">
+    <div id="jobsList" class="space-y-4"></div>
+    <div id="noJobs" class="hidden text-center text-slate-500 py-10">No jobs found.</div>
+  </section>
 
-<!-- JOB LIST -->
-<section class="max-w-4xl mx-auto px-6 pb-20">
-  <div id="jobsList" class="space-y-4"></div>
-  <div id="noJobs" class="hidden text-center text-slate-500 py-10">No jobs found.</div>
-</section>
-
-<!-- LOGIN / SIGNUP MODAL -->
-<div id="authModal"
-  class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center z-[2000]">
-  <div class="bg-slate-900 border border-slate-700 w-[90%] max-w-md rounded-2xl p-6 shadow-xl">
-
-    <h2 id="authTitle" class="text-xl font-semibold mb-4">Login</h2>
-
-    <input id="authEmail" type="email" placeholder="Email"
-      class="w-full mb-3 rounded-xl bg-slate-800 border border-slate-700 px-3 py-2 text-sm" />
-
-    <input id="authPassword" type="password" placeholder="Password"
-      class="w-full mb-4 rounded-xl bg-slate-800 border border-slate-700 px-3 py-2 text-sm" />
-
-    <p id="authError" class="text-rose-400 text-sm mb-3 hidden"></p>
-
-    <div class="flex items-center justify-between mt-2">
-      <button id="loginSubmit"
-        class="px-4 py-2 bg-emerald-500 text-slate-950 rounded-xl font-semibold hover:bg-emerald-400 transition">
-        Login
-      </button>
-
-      <button id="signupToggle"
-        class="px-4 py-2 border border-slate-600 rounded-xl text-slate-300 hover:bg-slate-800 transition">
-        Sign Up
-      </button>
-
-      <button onclick="closeAuthModal()"
-        class="px-3 py-2 border border-slate-600 rounded-xl text-slate-300 hover:bg-slate-800 transition">
-        Close
-      </button>
-    </div>
-
-  </div>
-</div>
-
-<!-- PREMIUM MODAL -->
-<div id="premiumModal"
-  class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-[2000]">
-  <div class="bg-slate-900 border border-slate-700 rounded-2xl p-6 max-w-md w-[90%]">
-    <h2 class="text-lg font-semibold text-emerald-400 mb-3">Premium Required</h2>
-    <p class="text-slate-300 text-sm mb-4">This feature requires Premium subscription.</p>
-
-    <button id="premiumGo"
-      class="px-4 py-2 bg-emerald-500 text-slate-950 rounded-xl font-semibold hover:bg-emerald-400 transition">
-      Upgrade Now
-    </button>
-  </div>
-</div>
-
-<script src="./app.js"></script>
 </body>
 </html>
-
