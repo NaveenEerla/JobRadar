@@ -1,45 +1,101 @@
-//const API_BASE = "https://floral-bird-8171.naveeneerla2022.workers.dev";
-
-// Injected via <script> tags in index.html
-const sb = window.supabase.createClient(
+// -----------------------------------------------------
+//  INITIALIZE SUPABASE
+// -----------------------------------------------------
+const supabase = window.supabase.createClient(
   window.SUPABASE_URL,
   window.SUPABASE_ANON_KEY
 );
 
-// Load jobs from Worker API
+// global memory
+let ALL_JOBS = [];
+let saved = new Set();
+
+// -----------------------------------------------------
+//  LOAD JOBS FROM CLOUDFLARE WORKER
+// -----------------------------------------------------
 async function loadJobs() {
   try {
-    const res = await fetch("https://floral-bird-8171.naveeneerla2022.workers.dev/api/jobs");
+    const res = await fetch("/api/jobs");
+    if (!res.ok) throw new Error("API error");
+
     const jobs = await res.json();
+    ALL_JOBS = jobs;
 
-    console.log("Loaded jobs:", jobs);
-
-    window.ALL_JOBS = jobs;
     renderJobs(jobs);
   } catch (err) {
     console.error("Failed to load jobs:", err);
   }
 }
 
-function renderJobs(jobs) {
-  const list = document.getElementById("jobsList");
-  list.innerHTML = "";
+// -----------------------------------------------------
+//  RENDER JOB CARD
+// -----------------------------------------------------
+function createJobCard(job) {
+  const div = document.createElement("div");
+  div.className = "bg-slate-900 border border-slate-700 p-4 rounded-xl";
 
-  for (const job of jobs) {
-    const div = document.createElement("div");
-    div.className = "job-card";
+  div.innerHTML = `
+    <h3 class="text-lg font-semibold">${job.title}</h3>
+    <p class="text-slate-300">${job.company}</p>
 
-    div.innerHTML = `
-      <div class="p-4 bg-slate-900 border border-slate-700 rounded-xl mb-4">
-        <h2 class="text-lg font-semibold">${job.title}</h2>
-        <p class="text-slate-400">${job.company}</p>
-        <p class="text-slate-500 text-sm mt-1">${job.posted_at}</p>
-        <a href="${job.url}" class="text-emerald-400 mt-2 inline-block" target="_blank">Apply</a>
-      </div>
-    `;
+    <div class="mt-3 flex gap-3">
+      <button class="px-3 py-1 border rounded-xl" onclick="toggleSave('${job.id}')">
+        ${saved.has(job.id) ? "⭐" : "☆"} Save
+      </button>
 
-    list.appendChild(div);
-  }
+      <a href="${job.url}" target="_blank"
+        class="px-3 py-1 border rounded-xl text-emerald-400">
+        Apply
+      </a>
+    </div>
+  `;
+
+  return div;
 }
 
+// -----------------------------------------------------
+//  RENDER JOB LIST
+// -----------------------------------------------------
+function renderJobs(jobs) {
+  const list = document.getElementById("jobsList");
+  const noJobs = document.getElementById("noJobs");
+  const search = document.getElementById("searchInput").value.toLowerCase();
+
+  const filtered = jobs.filter(j =>
+    (j.title + " " + j.company).toLowerCase().includes(search)
+  );
+
+  if (filtered.length === 0) {
+    noJobs.classList.remove("hidden");
+    list.innerHTML = "";
+    return;
+  }
+
+  noJobs.classList.add("hidden");
+  list.innerHTML = "";
+
+  filtered.forEach(job => list.appendChild(createJobCard(job)));
+}
+
+// search event
+document.getElementById("searchInput").addEventListener("input", () => {
+  renderJobs(ALL_JOBS);
+});
+
+// Dummy login button
+document.getElementById("loginBtn").onclick = () => {
+  alert("Login system not added yet!");
+};
+
+// save/unsave (local only)
+function toggleSave(id) {
+  if (saved.has(id)) saved.delete(id);
+  else saved.add(id);
+
+  renderJobs(ALL_JOBS);
+}
+
+// -----------------------------------------------------
+//  START
+// -----------------------------------------------------
 loadJobs();
