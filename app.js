@@ -15,7 +15,7 @@ let saved = new Set();
 // -----------------------------------------------------
 async function loadJobs() {
   try {
-    const res = await fetch("/api/jobs");
+    const res = await fetch("https://floral-bird-8171.naveeneerla2022.workers.dev/api/jobs");
     if (!res.ok) throw new Error("API error");
 
     const jobs = await res.json();
@@ -99,3 +99,4 @@ function toggleSave(id) {
 //  START
 // -----------------------------------------------------
 loadJobs();
+
