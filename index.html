@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Job Radar</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="styles.css" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+</head>
+
+<body class="bg-slate-950 text-slate-200">
+
+  <!-- HEADER -->
+  <header class="flex items-center justify-between px-6 py-4 bg-slate-900 border-b border-slate-800">
+    <h1 class="text-xl font-semibold">Job Radar</h1>
+
+    <div class="flex gap-3">
+      <button id="premiumBtn" class="hidden px-4 py-2 bg-emerald-500 text-slate-900 rounded-lg">⭐ Premium</button>
+      <button id="loginBtn" class="px-4 py-2 border border-slate-600 rounded-lg">Login</button>
+      <button id="logoutBtn" class="hidden px-4 py-2 border border-rose-500/80 text-rose-200 rounded-lg">Logout</button>
+    </div>
+  </header>
+
+  <!-- SEARCH -->
+  <section class="max-w-4xl mx-auto px-6 py-4">
+    <input id="searchInput"
+           placeholder="Search jobs..."
+           class="w-full bg-slate-900 border border-slate-700 rounded-xl px-3 py-2" />
+  </section>
+
+  <!-- JOB LIST -->
+  <section class="max-w-4xl mx-auto px-6 pb-20">
+    <div id="jobsList" class="space-y-4"></div>
+    <div id="noJobs" class="hidden text-center text-slate-500">No jobs found.</div>
+  </section>
+
+  <!-- LOGIN MODAL -->
+  <div id="authModal" class="hidden modal">
+    <div class="modal-box">
+      <h2 id="authTitle" class="text-xl font-semibold mb-4">Login</h2>
+
+      <input id="authEmail" type="email" placeholder="Email" class="input" />
+      <input id="authPassword" type="password" placeholder="Password" class="input" />
+
+      <p id="authError" class="text-rose-400 text-sm mb-3 hidden"></p>
+
+      <div class="flex justify-between">
+        <button id="loginSubmit" class="btn-emerald">Login</button>
+        <button id="signupToggle" class="btn">Sign Up</button>
+        <button onclick="closeAuthModal()" class="btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- PREMIUM MODAL -->
+  <div id="premiumModal" class="hidden modal">
+    <div class="modal-box">
+      <h2 class="text-xl font-semibold text-emerald-400 mb-3">Premium Required</h2>
+      <p>You need premium to use Tailor My Resume.</p>
+
+      <div class="flex justify-between mt-4">
+        <button id="premiumCheckout" class="btn-emerald">Upgrade</button>
+        <button onclick="closePremiumModal()" class="btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- RESUME MODAL -->
+  <div id="resumeModal" class="hidden modal">
+    <div class="modal-box max-w-xl">
+      <h2 class="text-xl font-semibold text-emerald-400 mb-3">Tailor My Resume</h2>
+
+      <textarea id="resumeOutput" class="textarea"></textarea>
+
+      <div class="flex justify-end gap-3 mt-3">
+        <button onclick="copyResumeOutput()" class="btn">Copy</button>
+        <button onclick="closeResumeModal()" class="btn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
