@@ -5,7 +5,7 @@ const API_BASE = "https://floral-bird-8171.naveeneerla2022.workers.dev";
 // ----------------------------
 const supabase = supabase.createClient(
   "https://motqrqculnywuovnibye.supabase.co",
-  "your-anon-key-here"
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1vdHFycWN1bG55d3Vvdm5pYnllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE3ODIzMzksImV4cCI6MjA3NzM1ODMzOX0.oAN57AEj9xnXhlkR2r2ZYddzBzptN8VxlXTLLYX5wzY"
 );
 
 let currentUser = null;
@@ -195,3 +195,4 @@ async function loadJobs() {
 
 restoreSession();
 loadJobs();
+
