@@ -1,190 +1,270 @@
-// CONFIG ----------------------------
-const WORKER_BASE = "https://floral-bird-8171.naveeneerla2022.workers.dev";
-const SUPABASE_URL = "https://motqrqculnywuovnibye.supabase.co";
-const SUPABASE_ANON = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1vdHFycWN1bG55d3Vvdm5pYnllIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE3ODIzMzksImV4cCI6MjA3NzM1ODMzOX0.oAN57AEj9xnXhlkR2r2ZYddzBzptN8VxlXTLLYX5wzY"; // your anon key
+/*************************************************
+ * CONFIG (from index.html global script)
+ *************************************************/
+let SUPABASE_URL = null;
+let SUPABASE_ANON = null;
 
-const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
-
-// GLOBALS ---------------------------
+/*************************************************
+ * GLOBAL STATE
+ *************************************************/
+let supabaseClient = null;
 let currentUser = null;
 let isPremium = false;
 let savedJobs = new Set();
 let ALL_JOBS = [];
 
-// UI HELPERS ------------------------
-function openAuthModal() { authModal.classList.remove("hidden"); }
-function closeAuthModal() { authModal.classList.add("hidden"); }
+/*************************************************
+ * WAIT UNTIL EVERYTHING IS LOADED
+ *************************************************/
+window.addEventListener("DOMContentLoaded", async () => {
+  SUPABASE_URL = window.SUPABASE_URL;
+  SUPABASE_ANON = window.SUPABASE_ANON_KEY;
 
-function openPremiumModal() { premiumModal.classList.remove("hidden"); }
-function closePremiumModal() { premiumModal.classList.add("hidden"); }
-
-// LOGIN UI --------------------------
-loginBtn.onclick = openAuthModal;
-
-signupToggle.onclick = () => {
-  if (authTitle.innerText === "Login") {
-    authTitle.innerText = "Sign Up";
-    loginSubmit.innerText = "Create Account";
-  } else {
-    authTitle.innerText = "Login";
-    loginSubmit.innerText = "Login";
+  if (!SUPABASE_URL || !SUPABASE_ANON) {
+    console.error("❌ Missing Supabase keys in index.html.");
+    return;
   }
-};
 
-loginSubmit.onclick = async () => {
-  const email = authEmail.value.trim();
-  const pass = authPassword.value.trim();
-  authError.classList.add("hidden");
+  // Initialize Supabase AFTER SDK is ready
+  supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON);
 
+  attachEventHandlers();
+
+  await restoreSession();
+  await loadJobs();
+});
+
+/*************************************************
+ * BUTTON HANDLERS
+ *************************************************/
+function attachEventHandlers() {
+  document.getElementById("loginBtn").onclick = () => openAuthModal();
+
+  document.getElementById("signupToggle").onclick = () => {
+    const title = document.getElementById("authTitle");
+    const btn = document.getElementById("loginSubmit");
+
+    if (title.innerText === "Login") {
+      title.innerText = "Sign Up";
+      btn.innerText = "Create Account";
+    } else {
+      title.innerText = "Login";
+      btn.innerText = "Login";
+    }
+  };
+
+  // Login / Signup
+  document.getElementById("loginSubmit").onclick = handleLoginSignup;
+
+  // Logout
+  document.getElementById("logoutBtn").onclick = async () => {
+    await supabaseClient.auth.signOut();
+    currentUser = null;
+    isPremium = false;
+    savedJobs.clear();
+
+    document.getElementById("logoutBtn").classList.add("hidden");
+    document.getElementById("loginBtn").classList.remove("hidden");
+
+    renderJobs(ALL_JOBS);
+  };
+}
+
+/*************************************************
+ * LOGIN / SIGNUP
+ *************************************************/
+async function handleLoginSignup() {
+  const email = document.getElementById("authEmail").value.trim();
+  const pass = document.getElementById("authPassword").value.trim();
+  const errorBox = document.getElementById("authError");
+
+  errorBox.classList.add("hidden");
+
+  const mode = document.getElementById("authTitle").innerText;
   let result;
 
-  if (authTitle.innerText === "Login") {
-    result = await supabase.auth.signInWithPassword({ email, password: pass });
+  if (mode === "Login") {
+    result = await supabaseClient.auth.signInWithPassword({ email, password: pass });
   } else {
-    result = await supabase.auth.signUp({ email, password: pass });
+    result = await supabaseClient.auth.signUp({ email, password: pass });
   }
 
   if (result.error) {
-    authError.innerText = result.error.message;
-    authError.classList.remove("hidden");
+    errorBox.innerText = result.error.message;
+    errorBox.classList.remove("hidden");
     return;
   }
 
   closeAuthModal();
-  restoreSession();
-};
+  await restoreSession();
+}
 
-logoutBtn.onclick = async () => {
-  await supabase.auth.signOut();
-  location.reload();
-};
-
-// SESSION RESTORE --------------------
+/*************************************************
+ * SESSION RESTORE
+ *************************************************/
 async function restoreSession() {
-  const { data } = await supabase.auth.getUser();
-  currentUser = data?.user || null;
+  const { data } = await supabaseClient.auth.getUser();
+  currentUser = data.user;
 
   if (!currentUser) {
-    loginBtn.classList.remove("hidden");
-    logoutBtn.classList.add("hidden");
-    isPremium = false;
+    document.getElementById("logoutBtn").classList.add("hidden");
+    document.getElementById("loginBtn").classList.remove("hidden");
     return;
   }
 
-  loginBtn.classList.add("hidden");
-  logoutBtn.classList.remove("hidden");
+  document.getElementById("loginBtn").classList.add("hidden");
+  document.getElementById("logoutBtn").classList.remove("hidden");
 
   await checkPremium();
   await loadSavedJobs();
 }
 
-// CHECK PREMIUM -----------------------
+/*************************************************
+ * CHECK PREMIUM
+ *************************************************/
 async function checkPremium() {
-  if (!currentUser) return;
+  if (!currentUser) return false;
 
   const res = await fetch(
-    `${WORKER_BASE}/api/checkPremium?user_id=${currentUser.id}`
+    `https://floral-bird-8171.naveeneerla2022.workers.dev/api/checkPremium?user_id=${currentUser.id}`
   );
-  const json = await res.json();
-  isPremium = json.active === true;
 
-  if (isPremium) premiumBtn.classList.remove("hidden");
+  if (!res.ok) return false;
+
+  const data = await res.json();
+  isPremium = data.active === true;
 }
 
-// LOAD SAVED JOBS ---------------------
+/*************************************************
+ * LOAD SAVED JOBS
+ *************************************************/
 async function loadSavedJobs() {
   if (!currentUser) return;
 
-  const { data } = await supabase
+  const { data } = await supabaseClient
     .from("saved_jobs")
     .select("job_id")
     .eq("user_id", currentUser.id);
 
-  savedJobs = new Set(data?.map(r => r.job_id));
+  savedJobs = new Set(data?.map(x => x.job_id));
 }
 
-// SAVE/UNSAVE -------------------------
-async function toggleSave(id) {
-  if (!currentUser) return openAuthModal();
+/*************************************************
+ * RENDER JOB CARD (DOM SAFE, NO TEMPLATE STRINGS)
+ *************************************************/
+function createJobCard(job) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "bg-slate-900 border border-slate-700 p-4 rounded-xl";
 
-  if (savedJobs.has(id)) {
-    await supabase.from("saved_jobs")
-      .delete()
-      .eq("user_id", currentUser.id)
-      .eq("job_id", id);
+  // Title
+  const title = document.createElement("h3");
+  title.className = "text-lg font-semibold";
+  title.textContent = job.title;
 
-    savedJobs.delete(id);
-  } else {
-    await supabase.from("saved_jobs")
-      .insert({ user_id: currentUser.id, job_id: id });
+  // Company
+  const company = document.createElement("p");
+  company.className = "text-slate-300 text-sm";
+  company.textContent = job.company;
 
-    savedJobs.add(id);
-  }
+  // Save button
+  const saveBtn = document.createElement("button");
+  saveBtn.className = "px-3 py-1 border rounded-xl text-sm";
+  saveBtn.textContent = savedJobs.has(job.id) ? "⭐ Saved" : "☆ Save";
+  saveBtn.onclick = () => toggleSave(job.id);
 
-  renderJobs(ALL_JOBS);
+  // Apply button
+  const applyBtn = document.createElement("a");
+  applyBtn.href = job.url;
+  applyBtn.target = "_blank";
+  applyBtn.className = "px-3 py-1 border rounded-xl text-emerald-400 text-sm";
+  applyBtn.textContent = "Apply";
+
+  // Button row
+  const row = document.createElement("div");
+  row.className = "flex gap-3 mt-3";
+  row.appendChild(saveBtn);
+  row.appendChild(applyBtn);
+
+  wrapper.appendChild(title);
+  wrapper.appendChild(company);
+  wrapper.appendChild(row);
+
+  return wrapper;
 }
 
-// RENDER JOB CARD ---------------------
-function jobCard(job) {
-  return `
-    <div class="bg-slate-900 border border-slate-700 p-4 rounded-xl">
-      <h3 class="text-lg font-semibold">${job.title}</h3>
-      <p class="text-slate-300">${job.company}</p>
+/*************************************************
+ * RENDER JOB LIST
+ *************************************************/
+function renderJobs(jobs) {
+  const list = document.getElementById("jobsList");
+  const empty = document.getElementById("noJobs");
 
-      <div class="mt-3 flex gap-3">
-        <button onclick="toggleSave('${job.id}')"
-          class="px-3 py-1 border rounded-xl">
-          ${savedJobs.has(job.id) ? "⭐ Saved" : "☆ Save"}
-        </button>
+  list.innerHTML = "";
 
-        <a href="${job.url}" target="_blank"
-          class="px-3 py-1 border rounded-xl text-emerald-400">Apply</a>
-      </div>
-    </div>
-  `;
-}
-
-// RENDER JOB LIST ---------------------
-function renderJobs(list) {
-  const search = searchInput.value.toLowerCase();
-
-  const filtered = list.filter(j =>
-    (j.title + " " + j.company).toLowerCase().includes(search)
-  );
-
-  if (filtered.length === 0) {
-    noJobs.classList.remove("hidden");
-    jobsList.innerHTML = "";
+  if (!jobs.length) {
+    empty.classList.remove("hidden");
     return;
   }
 
-  noJobs.classList.add("hidden");
-  jobsList.innerHTML = filtered.map(jobCard).join("");
+  empty.classList.add("hidden");
+
+  jobs.forEach(job => {
+    list.appendChild(createJobCard(job));
+  });
 }
 
-searchInput.oninput = () => renderJobs(ALL_JOBS);
-
-// LOAD JOBS ---------------------------
+/*************************************************
+ * LOAD JOBS (FROM WORKER API)
+ *************************************************/
 async function loadJobs() {
-  const res = await fetch(`${WORKER_BASE}/api/jobs`);
-  ALL_JOBS = await res.json();
+  try {
+    const res = await fetch("https://floral-bird-8171.naveeneerla2022.workers.dev/api/jobs");
+
+    if (!res.ok) throw new Error("API error");
+
+    ALL_JOBS = await res.json();
+
+    renderJobs(ALL_JOBS);
+  } catch (err) {
+    console.error("Failed to load jobs:", err);
+  }
+}
+
+/*************************************************
+ * SAVE / UNSAVE JOB
+ *************************************************/
+async function toggleSave(jobId) {
+  if (!currentUser) {
+    openAuthModal();
+    return;
+  }
+
+  if (savedJobs.has(jobId)) {
+    await supabaseClient
+      .from("saved_jobs")
+      .delete()
+      .eq("user_id", currentUser.id)
+      .eq("job_id", jobId);
+
+    savedJobs.delete(jobId);
+  } else {
+    await supabaseClient
+      .from("saved_jobs")
+      .insert({ user_id: currentUser.id, job_id: jobId });
+
+    savedJobs.add(jobId);
+  }
+
   renderJobs(ALL_JOBS);
 }
 
-// PREMIUM CHECKOUT --------------------
-premiumCheckout.onclick = async () => {
-  if (!currentUser) return openAuthModal();
+/*************************************************
+ * AUTH MODAL CONTROLLERS
+ *************************************************/
+function openAuthModal() {
+  document.getElementById("authModal").classList.remove("hidden");
+}
 
-  const res = await fetch(`${WORKER_BASE}/api/checkout`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ user_id: currentUser.id }),
-  });
-
-  const json = await res.json();
-  if (json.url) window.location = json.url;
-};
-
-// INIT --------------------------------
-restoreSession();
-loadJobs();
+function closeAuthModal() {
+  document.getElementById("authModal").classList.add("hidden");
+}
